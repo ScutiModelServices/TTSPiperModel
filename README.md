@@ -11,12 +11,26 @@ The engine runs in this process on the CPU with onnxruntime. No GPU, no Ollama.
 
 | Call | Purpose |
 |---|---|
-| `POST /v1/speak` | `{"text", "voice", "speed"}` returns a WAV file (`audio/wav`, 16-bit mono). Headers: `X-Audio-Seconds`, `X-Duration-Ms`, `X-Voice`. |
+| `POST /v1/speak` | `{"text", "voice", "speed", "stream"}` returns a WAV file (`audio/wav`, 16-bit mono). Headers: `X-Audio-Seconds`, `X-Duration-Ms`, `X-Voice`, `X-Cache` (`hit` when the kept answer was sent). |
 | `GET /v1/voices` | `{"voices", "default"}`; with a token limited to voices, only those. |
 | `GET /health` | `{"status": "ok", "model", "ready", "num_thread", "voices"}`; `ready` is true once the model is loaded. No token needed. |
 
 `text` is 1 to 5000 characters; `speed` 0.5 to 2 (default 1; above 1 is faster). Speed is the voice's `length_scale` (1 / speed). Other fields are refused
 with 422, so a caller asking for `mp3` finds out instead of getting WAV silently.
+
+**Streaming.** With `"stream": true` the WAV is sent sentence by sentence while the rest is still being made, so the
+first audio arrives after the first sentence instead of after all of the text. The header cannot know the length yet:
+its size fields are `0xFFFFFFFF` (read "until the connection ends"), and there is no `X-Audio-Seconds`. Players and
+`ffmpeg` read it; Python's `wave` module does not. Errors that can be known early (unknown voice, no speech in the
+text, model not loaded) are still normal HTTP errors; one after the first sentence cuts the stream off. Without
+`stream` the reply is the complete file with its length.
+
+**Cache.** The *Answers kept per replica* setting (`TTSPIPER_CACHE_SIZE`, default 64, 0 = off) keeps the last answers for
+the same text, voice and speed; a repeat is sent again without speaking (`X-Cache: hit`, a few milliseconds). An
+answer over 1 MB (about 20 seconds of audio) is not kept, so 64 entries use at most 64 MB per replica. The cache is
+per replica, so with N replicas the hit rate is about 1/N, and it is emptied when the voices are reloaded
+(new weights or a changed thread count). A finished stream fills it too. `tools/bench.py` varies the speed a little
+so it measures speaking, not the cache.
 
 **Voices.** The *Voices served* setting is a comma separated list of Piper voice names (`en_US-lessac-medium`,
 `en_GB-alba-medium`, ...) from the Hugging Face repository `rhasspy/piper-voices`. The first is the default. Each
@@ -28,7 +42,7 @@ are voice names). A token without a list may use every served voice.
 ## Admin page
 
 `/admin/` (password `TTSPIPER_ADMIN_PASSWORD`): tokens with voice scope, rate limit and expiry, usage numbers, CPU
-threads, the Settings card (update check hours, in-flight cap, voices served, voices repository, load at start), and the Updates card (**Check now** and **Download new weights**).
+threads, the Settings card (update check hours, in-flight cap, answers kept, voices served, voices repository, load at start), and the Updates card (**Check now** and **Download new weights**).
 New files are downloaded once into the shared models volume; the other replicas notice within a few seconds and
 load them on their next request. `/metrics` (admin password) is Prometheus text per token.
 
