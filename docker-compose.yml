@@ -1,0 +1,46 @@
+# TTSPiper service: N API replicas behind one nginx address. Each replica runs the model in its own process,
+# so RAM use is per replica; the downloaded weights are shared through the models volume.
+# Start:  docker compose up -d --build          (callers use http://<host>:9150)
+# Scale:  TTSPIPER_REPLICAS=3 docker compose up -d --build, then: docker compose restart ttspiper_lb
+
+name: ttspiper
+
+services:
+  ttspiper:
+    build: .
+    restart: unless-stopped
+    environment:
+      TTSPIPER_ADMIN_PASSWORD: ${TTSPIPER_ADMIN_PASSWORD:-}
+      TTSPIPER_NUM_THREAD: ${TTSPIPER_NUM_THREAD:-}
+      TTSPIPER_REPLICAS: ${TTSPIPER_REPLICAS:-1}  # shown read-only on /admin/
+    volumes:
+      - models:/models
+      - tokens:/data
+    deploy:
+      replicas: ${TTSPIPER_REPLICAS:-1}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9150/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 300s
+    networks: [ttspiper]
+
+  ttspiper_lb:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${TTSPIPER_PORT:-9150}:9150"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      ttspiper:
+        condition: service_healthy
+    networks: [ttspiper]
+
+volumes:
+  models:
+  tokens:
+
+networks:
+  # Other stacks reach http://ttspiper_lb:9150 by joining this network.
+  ttspiper:
