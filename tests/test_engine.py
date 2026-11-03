@@ -84,6 +84,12 @@ def test_the_revision_calls_use_the_repository():
 def test_voice_writes_a_wav_with_the_speed_as_length_scale():
     class Piper:
         scale = None
+        config = type("Config", (), {"sample_rate": 22050})()
+
+        def synthesize(self, text, syn_config):
+            Piper.scale = syn_config.length_scale
+            for part in text.split("."):
+                yield type("Chunk", (), {"audio_int16_bytes": b"\1\0" * 100 if part else b""})()
 
         def synthesize_wav(self, text, wav, syn_config):
             Piper.scale = syn_config.length_scale
@@ -94,3 +100,63 @@ def test_voice_writes_a_wav_with_the_speed_as_length_scale():
 
     wav, seconds = Voice(Piper()).speak("hi", 2.0)
     assert Piper.scale == 0.5 and seconds == 1.0 and wav[:4] == b"RIFF"
+
+
+def test_voice_pieces_are_one_per_sentence_with_the_speed_as_length_scale():
+    class Piper:
+        config = type("Config", (), {"sample_rate": 22050})()
+
+        def synthesize(self, text, syn_config):
+            Piper.scale = syn_config.length_scale
+            for part in text.split("."):
+                yield type("Chunk", (), {"audio_int16_bytes": b"\1\0" * 100 if part else b""})()
+
+    voice = Voice(Piper())
+    assert voice.rate == 22050
+    assert list(voice.pieces("One.Two.", 2.0)) == [b"\1\0" * 100] * 2 and Piper.scale == 0.5  # an empty chunk is skipped
+
+
+def collect(engine, text="One. Two. Three.", voice=None, speed=1.0):
+    async def run():
+        return [piece async for piece in engine.stream(text, voice, speed)]
+
+    return asyncio.run(run())
+
+
+def test_stream_gives_the_audio_sentence_by_sentence():
+    engine = make_engine()
+    pieces = collect(engine, voice="en_GB-alba-medium", speed=1.5)
+    assert [rate for rate, _ in pieces] == [22050] * 3 and all(len(data) == 4410 for _, data in pieces)
+    assert engine.loads == [("en_GB-alba-medium", None)]
+    assert engine.made[0].calls == [{"text": "One. Two. Three.", "speed": 1.5, "stream": True}]
+
+
+def test_stream_refuses_an_unknown_voice_and_empty_audio():
+    with pytest.raises(EngineError) as unknown:
+        collect(make_engine(), voice="en_US-ryan-high")
+    assert unknown.value.status == 404
+    with pytest.raises(EngineError) as empty:
+        collect(make_engine(), text="...")
+    assert empty.value.status == 422
+
+
+def test_closing_a_stream_early_frees_the_generation_slot():
+    async def run():
+        engine = make_engine()
+        pieces = engine.stream("One. Two. Three.", None, 1.0)
+        await anext(pieces)
+        await pieces.aclose()
+        return await asyncio.wait_for(engine.synthesize("again", None, 1.0), 2)
+
+    assert asyncio.run(run())["seconds"] == 0.5
+
+
+def test_generation_changes_when_the_loaded_voices_are_dropped():
+    engine = make_engine()
+    before = engine.generation
+    engine.num_thread = 3
+    assert engine.generation == before + 1
+    engine.num_thread = 3  # no change, nothing dropped
+    assert engine.generation == before + 1
+    asyncio.run(engine.unload())
+    assert engine.generation == before + 2

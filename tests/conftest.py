@@ -25,12 +25,20 @@ def silence(seconds: float = 0.5, rate: int = 22050) -> bytes:
 class FakeVoice:
     """Stands in for a loaded voice: answers half a second of silence and records every call."""
 
+    rate = 22050
+
     def __init__(self, name, threads):
         self.name, self.threads, self.calls = name, threads, []
 
     def speak(self, text, speed):
         self.calls.append({"text": text, "speed": speed})
         return silence(), 0.5
+
+    def pieces(self, text, speed):
+        """One 0.1 s piece per sentence, as the real voice does."""
+        self.calls.append({"text": text, "speed": speed, "stream": True})
+        for sentence in [s for s in text.split(".") if s.strip()]:
+            yield b"\1\0" * (self.rate // 10)
 
 
 def make_engine(**options):

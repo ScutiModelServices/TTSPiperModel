@@ -23,7 +23,7 @@ In `.env` next to `docker-compose.yml`:
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
 value beats the environment variable named in brackets): update check hours (`TTSPIPER_UPDATE_CHECK_HOURS`, 6),
-in-flight cap (`TTSPIPER_MAX_INFLIGHT`, 0 = 4), voices served (`TTSPIPER_VOICES`, default `en_US-lessac-medium`; comma separated Piper voice names, the first is the default, each downloads on first use), voices repository (`TTSPIPER_MODEL`, restart) and load at start (`TTSPIPER_WARM`, restart). Compose does not pass these;
+in-flight cap (`TTSPIPER_MAX_INFLIGHT`, 0 = 4), answers kept per replica (`TTSPIPER_CACHE_SIZE`, 64, 0 = off; at most 1 MB each), voices served (`TTSPIPER_VOICES`, default `en_US-lessac-medium`; comma separated Piper voice names, the first is the default, each downloads on first use), voices repository (`TTSPIPER_MODEL`, restart) and load at start (`TTSPIPER_WARM`, restart). Compose does not pass these;
 add the variable under `environment:` of `ttspiper` to use one as a starting value.
 
 ## Start

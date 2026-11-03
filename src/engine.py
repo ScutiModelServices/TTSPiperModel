@@ -17,7 +17,7 @@ import threading
 import uuid
 import wave
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, AsyncIterator, Callable, Iterator
 
 _log = logging.getLogger(__name__)
 
@@ -45,6 +45,15 @@ class Voice:
 
     def __init__(self, voice: Any) -> None:
         self._voice = voice
+        self.rate: int = voice.config.sample_rate
+
+    def pieces(self, text: str, speed: float) -> Iterator[bytes]:
+        """16-bit mono audio, one piece per sentence, made as the caller asks for the next one."""
+        from piper import SynthesisConfig
+
+        for chunk in self._voice.synthesize(text, syn_config=SynthesisConfig(length_scale=1 / speed)):
+            if chunk.audio_int16_bytes:
+                yield chunk.audio_int16_bytes
 
     def speak(self, text: str, speed: float) -> tuple[bytes, float]:
         from piper import SynthesisConfig
@@ -129,6 +138,7 @@ class PiperEngine:
         self._loaded: dict[str, Voice] = {}
         self._load_lock = threading.Lock()
         self._gate = asyncio.Semaphore(1)
+        self.generation = 0  # part of the answer cache key; changes whenever the loaded voices are dropped
 
     @property
     def voices(self) -> list[str]:
@@ -169,13 +179,31 @@ class PiperEngine:
                 self._loaded[name] = self._loader(self.model, name, self._threads)
             return self._loaded[name]
 
-    async def synthesize(self, text: str, voice: str | None, speed: float) -> dict[str, Any]:
+    def _name(self, voice: str | None) -> str:
         name = voice or self.default_voice
         if name not in self.voice_names:
             raise EngineError(f"Voice {name!r} is not served here; the voices are {', '.join(self.voice_names)}", 404)
+        return name
+
+    async def synthesize(self, text: str, voice: str | None, speed: float) -> dict[str, Any]:
+        name = self._name(voice)
         async with self._gate:
             wav, seconds = await asyncio.to_thread(self._speak, text, name, speed)
         return {"wav": wav, "seconds": seconds, "voice": name}
+
+    async def stream(self, text: str, voice: str | None, speed: float) -> AsyncIterator[tuple[int, bytes]]:
+        """The audio as it is made: (sample rate, 16-bit mono PCM) per sentence. Holds the generation slot until
+        the last piece, or until the caller closes the iterator."""
+        name = self._name(voice)
+        async with self._gate:
+            loaded = await asyncio.to_thread(self._voice, name)
+            pieces = loaded.pieces(text, speed)
+            made = False
+            while (piece := await asyncio.to_thread(next, pieces, None)) is not None:
+                made = True
+                yield loaded.rate, piece
+        if not made:
+            raise EngineError("No speech could be made from that text.", 422)
 
     def _speak(self, text: str, name: str, speed: float) -> tuple[bytes, float]:
         return self._voice(name).speak(text, speed)
@@ -209,6 +237,7 @@ class PiperEngine:
     def _forget(self) -> None:
         with self._load_lock:
             self._loaded = {}
+            self.generation += 1  # kept answers are from the old files or threads
 
     def _read_marker(self) -> str | None:
         try:
