@@ -19,7 +19,7 @@ In `.env` next to `docker-compose.yml`:
 | `TTSPIPER_REPLICAS` | `1` | Number of `ttspiper` containers. Read by Compose. |
 | `TTSPIPER_PORT` | `9150` | Host port `ttspiper_lb` publishes. |
 | `TTSPIPER_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
-| `TTSPIPER_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. |
+| `TTSPIPER_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
 value beats the environment variable named in brackets): update check hours (`TTSPIPER_UPDATE_CHECK_HOURS`, 6),
