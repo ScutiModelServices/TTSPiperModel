@@ -1,6 +1,6 @@
 # TTSPiper service: N API replicas behind one nginx address. Each replica runs the model in its own process,
 # so RAM use is per replica; the downloaded weights are shared through the models volume.
-# Start:  docker compose up -d --build          (callers use http://<host>:9150)
+# Start:  docker compose up -d --build          (callers use http://<host>:29320)
 # Scale:  TTSPIPER_REPLICAS=3 docker compose up -d --build, then: docker compose restart tts_piper_model_lb
 
 name: tts_piper_model
@@ -20,7 +20,7 @@ services:
     deploy:
       replicas: ${TTSPIPER_REPLICAS:-1}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9150/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29320/health')"]
       interval: 15s
       timeout: 5s
       start_period: 300s
@@ -31,7 +31,7 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "${TTSPIPER_PORT:-9150}:9150"
+      - "${TTSPIPER_PORT:-29320}:29320"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -48,7 +48,7 @@ volumes:
   tts_piper_model_data:
     name: tts_piper_model_data
 networks:
-  # Other stacks reach http://tts_piper_model_lb:9150 by joining this network.
+  # Other stacks reach http://tts_piper_model_lb:29320 by joining this network.
   tts_piper_model:
     name: tts_piper_model
   citadel:

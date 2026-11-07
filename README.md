@@ -49,11 +49,11 @@ load them on their next request. `/metrics` (admin password) is Prometheus text 
 ## Run
 
 ```bash
-docker compose up -d --build        # http://<host>:9150
-python tools/bench.py http://127.0.0.1:9150 --save out
+docker compose up -d --build        # http://<host>:29320
+python tools/bench.py http://127.0.0.1:29320 --save out
 ```
 
-Without Docker: `run.bat` (uv, listens on `127.0.0.1:9150`). The first start downloads 63 MB. Memory:
+Without Docker: `run.bat` (uv, listens on `127.0.0.1:29320`). The first start downloads 63 MB. Memory:
 about 300 MB per replica with one voice loaded, so `TTSPIPER_REPLICAS` multiplies it. See `deployment.md`.
 
 ## Tests

@@ -15,7 +15,7 @@ Run Piper text to speech on the CPU in Docker Desktop on the machine you work on
    ```bash
    cp .env.example .env
    ```
-   Set `TTSPIPER_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `TTSPIPER_PORT=9150`. Leave `TTSPIPER_REPLICAS=1`.
+   Set `TTSPIPER_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `TTSPIPER_PORT=29320`. Leave `TTSPIPER_REPLICAS=1`.
 2. Start:
    ```bash
    docker compose up -d --build
@@ -24,18 +24,18 @@ Run Piper text to speech on the CPU in Docker Desktop on the machine you work on
    (up to 300 s grace). Watch with `docker compose ps` and `docker compose logs -f tts_piper_model`.
 3. Check:
    ```bash
-   curl http://127.0.0.1:9150/health
+   curl http://127.0.0.1:29320/health
    ```
    `ready` is `false` until the model has loaded, then `true`.
-4. Open the admin page: `http://127.0.0.1:9150/admin/` (see [guide-web-ui.md](guide-web-ui.md)) and make a token for each caller.
+4. Open the admin page: `http://127.0.0.1:29320/admin/` (see [guide-web-ui.md](guide-web-ui.md)) and make a token for each caller.
 5. Try a call:
    ```bash
-   curl -X POST http://127.0.0.1:9150/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttspiper_..." -d '{"text":"Hello from the model service."}' -o hello.wav
+   curl -X POST http://127.0.0.1:29320/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttspiper_..." -d '{"text":"Hello from the model service."}' -o hello.wav
    ```
    Expect a WAV file, `hello.wav`.
 6. Callers connect to the published port. The caller holds the URL and token:
-   - Caller on the host: `http://127.0.0.1:9150`.
-   - Caller in another Docker stack on the same host: `http://host.docker.internal:9150`.
+   - Caller on the host: `http://127.0.0.1:29320`.
+   - Caller in another Docker stack on the same host: `http://host.docker.internal:29320`.
 
 ## Settings
 
@@ -44,7 +44,7 @@ In `.env` next to `docker-compose.yml`:
 | Variable | Default | Effect |
 |---|---|---|
 | `TTSPIPER_REPLICAS` | `1` | Number of `tts_piper_model` containers. Read by Compose. |
-| `TTSPIPER_PORT` | `9150` | Host port `tts_piper_model_lb` publishes. |
+| `TTSPIPER_PORT` | `29320` | Host port `tts_piper_model_lb` publishes. |
 | `TTSPIPER_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
 | `TTSPIPER_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
@@ -67,14 +67,14 @@ docker compose up -d --build && docker compose restart tts_piper_model_lb   # af
 Try it and time it:
 
 ```bash
-python tools/bench.py http://127.0.0.1:9150 --save out
+python tools/bench.py http://127.0.0.1:29320 --save out
 ```
 
 ## Problems
 
 | Symptom | Fix |
 |---|---|
-| `address already in use` on 9150 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPIPER_PORT`. |
+| `address already in use` on 29320 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPIPER_PORT`. |
 | `/health` shows `ready: false` for minutes | First start: the weights are downloading or loading. Check `docker compose logs -f tts_piper_model`. |
 | 401 Invalid token | The caller's token is missing or revoked; make one on `/admin/`. |
 | Container restarts in a loop | Out of RAM. Raise the Docker Desktop memory limit or lower the replica count. |
@@ -86,4 +86,4 @@ python tools/bench.py http://127.0.0.1:9150 --save out
 | 429 | Over the token's rate limit, or too many calls waiting for the model. |
 | nginx 502 after scaling | `tts_piper_model_lb` not restarted after the replica count changed. |
 
-The load balancer also joins external `citadel_core` as `tts_piper_model_lb`. Start the Citadel stack first so that network exists; tool services on it use `http://tts_piper_model_lb:9150`. Docker project and API image are `tts_piper_model` and `tts_piper_model:latest`; persistent volumes have explicit `tts_piper_model_*` names. Volume migration and rollback instructions are in [CHANGELOG.md](../CHANGELOG.md).
+The load balancer also joins external `citadel_core` as `tts_piper_model_lb`. Start the Citadel stack first so that network exists; tool services on it use `http://tts_piper_model_lb:29320`. Docker project and API image are `tts_piper_model` and `tts_piper_model:latest`; persistent volumes have explicit `tts_piper_model_*` names. Volume migration and rollback instructions are in [CHANGELOG.md](../CHANGELOG.md).

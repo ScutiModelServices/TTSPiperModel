@@ -1,6 +1,6 @@
 # TTS_Piper_Model
 
-Piper text to speech served over HTTP, behind the shared model-service admin page, tokens and settings. Port 9150, env prefix `TTSPIPER_`, token prefix `ttspiper_`.
+Piper text to speech served over HTTP, behind the shared model-service admin page, tokens and settings. Port 29320, env prefix `TTSPIPER_`, token prefix `ttspiper_`.
 
 ## Agent instructions
 This file is the one instruction file for every coding agent; `CLAUDE.md` only imports it (`@AGENTS.md`). Edit this file, never `CLAUDE.md`.
