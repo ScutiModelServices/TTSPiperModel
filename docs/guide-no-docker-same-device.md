@@ -8,7 +8,7 @@ Run Piper text to speech on the CPU directly with Python: one process, no load b
 - RAM for the model (one copy).
 
 ## Start
-Double-click `run.bat`, or run it in a terminal from `TTSPiperModel\`. It runs `uv sync` to create or update `.venv`, then starts
+Double-click `run.bat`, or run it in a terminal from `TTSPiperModel\`. Choose **1 Run the service** in the menu, or run `run.bat run` to skip the menu. It runs `uv sync` to create or update `.venv`, then starts
 `python src/app.py`. The first start downloads 63 MB of voice files (each further voice downloads on first use).
 
 Linux or macOS:
