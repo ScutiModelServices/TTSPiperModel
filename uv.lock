@@ -918,7 +918,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ttspiper-service"
+name = "tts-piper-model"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

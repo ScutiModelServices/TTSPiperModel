@@ -1,8 +1,8 @@
-# TTSPiperModel
+# TTS_Piper_Model
 
 Piper text to speech (default voice `en_US-lessac-medium`), served over HTTP so projects send text instead of loading a model themselves. It has the same admin page,
-tokens, rate limits, metrics, settings and update checks as `LayaModel`, `MiniCPM52BModel` and `BitNet2BModel`.
-`TTSParadeeModel` is the same service with the other engine, so the two can be compared on the same sentences
+tokens, rate limits, metrics, settings and update checks as `DSC_Laya_Model`, `CNV_MiniCPM52B_Model` and `CNV_BitNet2B_Model`.
+`TTS_Paradee_Model` is the same service with the other engine, so the two can be compared on the same sentences
 (`tools/bench.py`).
 
 The engine runs in this process on the CPU with onnxruntime. No GPU, no Ollama.

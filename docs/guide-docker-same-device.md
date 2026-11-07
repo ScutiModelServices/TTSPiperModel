@@ -1,4 +1,4 @@
-# TTSPiperModel: Docker Desktop on this PC
+# TTS_Piper_Model: Docker Desktop on this PC
 
 Run Piper text to speech on the CPU in Docker Desktop on the machine you work on, so other programs on it can call it.
 
@@ -11,7 +11,7 @@ Run Piper text to speech on the CPU in Docker Desktop on the machine you work on
 
 ## Steps
 
-1. Configure. In `TTSPiperModel/`:
+1. Configure. In `TTS_Piper_Model/`:
    ```bash
    cp .env.example .env
    ```
@@ -20,8 +20,8 @@ Run Piper text to speech on the CPU in Docker Desktop on the machine you work on
    ```bash
    docker compose up -d --build
    ```
-   The first start downloads 63 MB of voice files (each further voice downloads on first use) into the `models` volume. `ttspiper_lb` starts only after the service is healthy
-   (up to 300 s grace). Watch with `docker compose ps` and `docker compose logs -f ttspiper`.
+   The first start downloads 63 MB of voice files (each further voice downloads on first use) into the `tts_piper_model_models` volume. `tts_piper_model_lb` starts only after the service is healthy
+   (up to 300 s grace). Watch with `docker compose ps` and `docker compose logs -f tts_piper_model`.
 3. Check:
    ```bash
    curl http://127.0.0.1:9150/health
@@ -43,23 +43,23 @@ In `.env` next to `docker-compose.yml`:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `TTSPIPER_REPLICAS` | `1` | Number of `ttspiper` containers. Read by Compose. |
-| `TTSPIPER_PORT` | `9150` | Host port `ttspiper_lb` publishes. |
+| `TTSPIPER_REPLICAS` | `1` | Number of `tts_piper_model` containers. Read by Compose. |
+| `TTSPIPER_PORT` | `9150` | Host port `tts_piper_model_lb` publishes. |
 | `TTSPIPER_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
 | `TTSPIPER_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
 value beats the environment variable named in brackets): update check hours (`TTSPIPER_UPDATE_CHECK_HOURS`, 6),
 in-flight cap (`TTSPIPER_MAX_INFLIGHT`, 0 = 4), answers kept per replica (`TTSPIPER_CACHE_SIZE`, 64, 0 = off; at most 1 MB each), voices served (`TTSPIPER_VOICES`, default `en_US-lessac-medium`; comma separated Piper voice names, the first is the default, each downloads on first use), voices repository (`TTSPIPER_MODEL`, restart) and load at start (`TTSPIPER_WARM`, restart). Compose does not pass these;
-add the variable under `environment:` of `ttspiper` to use one as a starting value.
+add the variable under `environment:` of `tts_piper_model` to use one as a starting value.
 
 ## Daily use
 
 ```bash
 docker compose ps          # state
-docker compose logs -f ttspiper
+docker compose logs -f tts_piper_model
 docker compose down        # stop (the weights volume is kept)
-docker compose up -d --build && docker compose restart ttspiper_lb   # after a code change
+docker compose up -d --build && docker compose restart tts_piper_model_lb   # after a code change
 ```
 
 ## Time it
@@ -75,13 +75,15 @@ python tools/bench.py http://127.0.0.1:9150 --save out
 | Symptom | Fix |
 |---|---|
 | `address already in use` on 9150 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPIPER_PORT`. |
-| `/health` shows `ready: false` for minutes | First start: the weights are downloading or loading. Check `docker compose logs -f ttspiper`. |
+| `/health` shows `ready: false` for minutes | First start: the weights are downloading or loading. Check `docker compose logs -f tts_piper_model`. |
 | 401 Invalid token | The caller's token is missing or revoked; make one on `/admin/`. |
 | Container restarts in a loop | Out of RAM. Raise the Docker Desktop memory limit or lower the replica count. |
-| `ttspiper_lb` never starts | No replica is healthy yet (first download, or out of memory). `docker compose logs ttspiper`. |
+| `tts_piper_model_lb` never starts | No replica is healthy yet (first download, or out of memory). `docker compose logs tts_piper_model`. |
 | Replicas restart in a loop | Out of RAM. Lower `TTSPIPER_REPLICAS`. |
 | 403 "may not use voice" | The token's list on `/admin/` does not include that voice (or the default voice, when `voice` is left out). |
 | 404 on `/v1/speak` | The voice is not served here. `GET /v1/voices` lists them. |
 | 422 on `format` or another field | Only `text`, `voice` and `speed` exist; the reply is always WAV. |
 | 429 | Over the token's rate limit, or too many calls waiting for the model. |
-| nginx 502 after scaling | `ttspiper_lb` not restarted after the replica count changed. |
+| nginx 502 after scaling | `tts_piper_model_lb` not restarted after the replica count changed. |
+
+The load balancer also joins external `citadel_core` as `tts_piper_model_lb`. Start the Citadel stack first so that network exists; tool services on it use `http://tts_piper_model_lb:9150`. Docker project and API image are `tts_piper_model` and `tts_piper_model:latest`; persistent volumes have explicit `tts_piper_model_*` names. Volume migration and rollback instructions are in [CHANGELOG.md](../CHANGELOG.md).

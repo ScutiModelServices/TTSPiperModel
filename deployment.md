@@ -1,7 +1,7 @@
-# Deploying TTSPiperModel
+# Deploying TTS_Piper_Model
 
-TTSPiperModel is one HTTP service (port 9150). It runs as `ttspiper` replicas behind an nginx load balancer,
-`ttspiper_lb`. Callers use `http://<host>:9150`; they never reach a replica directly.
+TTS_Piper_Model is one HTTP service (port 9150). It runs as `tts_piper_model` replicas behind an nginx load balancer,
+`tts_piper_model_lb`. Callers use `http://<host>:9150`; they never reach a replica directly.
 
 ## Ways to run it
 
